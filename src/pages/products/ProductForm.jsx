@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import api from "../../utils/axios";
 import { endpoints } from "../../constants";
+import { useMutation } from "@tanstack/react-query";
+
+const createProduct = async (productData) => {
+    try {
+        const response = await api.post(endpoints.createProduct, productData);
+        return response.data;
+    } catch (error) {
+        throw new Error("Failed to create product");
+    }
+};
 
 export const ProductForm = (initialData = {}) => {
     const [features, setFeatures] = useState([""]);
     const [images, setImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
+    const [isImageUploading, setIsImageUploading] = useState(false);
     const [productData, setProductData] = useState({
         title: initialData.title || "",
         brand: initialData.brand || "",
@@ -27,6 +38,14 @@ export const ProductForm = (initialData = {}) => {
         updated[index] = value;
         setFeatures(updated);
     };
+
+    const createProductMuttion = useMutation({
+        mutationKey: ["createProduct"],
+        mutationFn: createProduct,
+        onSuccess: (data) => {
+            alert("Product created successfully!");
+        },
+    });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -51,11 +70,20 @@ export const ProductForm = (initialData = {}) => {
         const previews = files.map((file) => URL.createObjectURL(file));
         setImagePreviews((prev) => [...prev, ...previews]);
         setImages((prev) => [...prev, ...files]);
-        const imageUrls = await api.post(endpoints.UploadImages, formData);
-        setProductData((prevData) => ({
-            ...prevData,
-            images: [...prevData.images, ...imageUrls.data.images],
-        }));
+
+        try {
+            setIsImageUploading(true);
+            const imageUrls = await api.post(endpoints.UploadImages, formData);
+            setProductData((prevData) => ({
+                ...prevData,
+                images: [...prevData.images, ...imageUrls.data.images],
+            }));
+        } catch (error) {
+            alert("Image upload failed. Please try again.");
+            return;
+        } finally {
+            setIsImageUploading(false);
+        }
     };
     const removeimage = (index) => {
         const prevImages = imagePreviews.filter((_, i) => i !== index);
@@ -70,6 +98,7 @@ export const ProductForm = (initialData = {}) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         console.log("Submitting product:", { ...productData, features });
+        createProductMuttion.mutate({ ...productData, features });
     };
 
     return (
@@ -85,6 +114,7 @@ export const ProductForm = (initialData = {}) => {
                     <input
                         type="text"
                         name="title"
+                        required
                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white"
                         placeholder="Classic Denim Jacket"
                         onChange={(e) => handleChange(e)}
@@ -95,6 +125,7 @@ export const ProductForm = (initialData = {}) => {
                         <label className="block text-sm mb-1">Brand</label>
                         <input
                             type="text"
+                            required
                             name="brand"
                             className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                             placeholder="Levi's"
@@ -104,6 +135,7 @@ export const ProductForm = (initialData = {}) => {
                     <div>
                         <label className="block text-sm mb-1">Stock</label>
                         <input
+                            required
                             name="stock"
                             type="number"
                             className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
@@ -119,6 +151,7 @@ export const ProductForm = (initialData = {}) => {
                         <label className="block text-sm mb-1">Price</label>
                         <input
                             type="number"
+                            required
                             name="price"
                             className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                             placeholder="59.99"
@@ -129,6 +162,7 @@ export const ProductForm = (initialData = {}) => {
                         <label className="block text-sm mb-1">Original Price</label>
                         <input
                             type="number"
+                            required
                             name="originalPrice"
                             className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                             placeholder="79.99"
@@ -142,6 +176,7 @@ export const ProductForm = (initialData = {}) => {
                     <label className="block text-sm mb-1">Category</label>
                     <input
                         type="text"
+                        required
                         name="category"
                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                         placeholder="Jackets"
@@ -151,26 +186,34 @@ export const ProductForm = (initialData = {}) => {
                 {/* image previews */}
                 <div>
                     {imagePreviews.length > 0 && (
-                        <div className="flex gap-4 mb-4">
-                            {imagePreviews.map((src, index) => (
-                                <div
-                                    key={index}
-                                    className="relative w-20 h-20  rounded-lg border border-white/10 group"
-                                >
-                                    <img
-                                        src={src}
-                                        alt={`Preview ${index + 1}`}
-                                        className="object-cover w-full h-full"
-                                    />
-                                    <button
-                                        className="hidden group-hover:grid bg-black/60 w-full h-full absolute top-0 left-0 place-items-center"
-                                        type="button"
+                        <>
+                            <div className="flex gap-4 mb-4">
+                                {imagePreviews.map((src, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative w-20 h-20  rounded-lg border border-white/10 group"
                                     >
-                                        <Trash2 color="red" onClick={() => removeimage(index)} />
-                                    </button>
+                                        <img
+                                            src={src}
+                                            alt={`Preview ${index + 1}`}
+                                            className="object-cover w-full h-full"
+                                        />
+                                        <button
+                                            className="hidden group-hover:grid bg-black/60 w-full h-full absolute top-0 left-0 place-items-center"
+                                            type="button"
+                                        >
+                                            <Trash2 color="red" onClick={() => removeimage(index)} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            {isImageUploading && (
+                                <div className="flex items-center">
+                                    <span className="text-white text-sm">Uploading</span>
+                                    <DotLoader />
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     )}
                 </div>
                 {/* Image */}
@@ -179,6 +222,7 @@ export const ProductForm = (initialData = {}) => {
                     <input
                         type="file"
                         name="images"
+                        required
                         multiple
                         accept="image/*"
                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
@@ -191,6 +235,7 @@ export const ProductForm = (initialData = {}) => {
                     <label className="block text-sm mb-1">Short Description</label>
                     <textarea
                         rows="2"
+                        required
                         name="shortDescription"
                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                         placeholder="Timeless denim jacket with a relaxed fit..."
@@ -203,6 +248,7 @@ export const ProductForm = (initialData = {}) => {
                     <label className="block text-sm mb-1">Detailed Description</label>
                     <textarea
                         rows="4"
+                        required
                         name="detailedDescription"
                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                         placeholder="Crafted from premium 12-ounce denim..."
@@ -220,6 +266,7 @@ export const ProductForm = (initialData = {}) => {
                                 <input
                                     type="text"
                                     value={feature}
+                                    required
                                     onChange={(e) => updateFeature(index, e.target.value)}
                                     className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10"
                                     placeholder="Metal button closures"
@@ -250,10 +297,27 @@ export const ProductForm = (initialData = {}) => {
                 <button
                     type="submit"
                     className="w-full bg-indigo-500 hover:bg-indigo-400 text-white py-3 rounded-xl mt-6 font-medium shadow-lg transition"
+                    disabled={isImageUploading ? true : false}
                 >
                     Add Product
                 </button>
             </form>
         </div>
     );
+};
+const DotLoader = () => {
+    const [dots, setDots] = useState(".");
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setDots((prev) => {
+                if (prev === "....") return ".";
+                return prev + ".";
+            });
+        }, 300);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    return <span className="text-white whitespace-pre">{dots}</span>;
 };
