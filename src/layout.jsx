@@ -6,7 +6,7 @@ export const Layout = () => {
             <div className="h-screen w-[15%]">
                 <SideBar />
             </div>
-            <div className="flex-1 bg-linear-to-br from-primary via-secondary to-primary p-20 pr-40 h-screen">
+            <div className="flex-1 bg-linear-to-br from-primary via-secondary to-primary p-20 pr-40 h-screen overflow-auto">
                 <Outlet />
             </div>
         </div>
